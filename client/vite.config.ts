@@ -7,13 +7,13 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-recharts': ['recharts'],
+          'vendor-lucide': ['lucide-react'],
         },
       },
     },
-    chunkSizeWarningLimit: 1000, // Increase limit to 1000kb
+    chunkSizeWarningLimit: 1500, // Increase limit even more
   },
 })
