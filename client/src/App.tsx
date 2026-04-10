@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
-  ArrowUpCircle, 
-  ArrowDownCircle, 
   Target, 
   History, 
-  Settings,
   Plus,
   X,
   LogOut,
@@ -21,9 +18,6 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
   BarChart,
   Bar
 } from 'recharts';
@@ -45,7 +39,6 @@ interface Budget {
   monthly_limit: number;
 }
 
-const COLORS = ['#10b981', '#3b82f6', '#f43f5e', '#f59e0b', '#8b5cf6'];
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 function App() {
@@ -198,15 +191,6 @@ function App() {
     name: t.date,
     amount: t.type === 'expense' ? -t.amount : t.amount
   }));
-
-  const pieData = Object.entries(
-    transactions
-      .filter(t => t.type === 'expense')
-      .reduce((acc, t) => {
-        acc[t.category] = (acc[t.category] || 0) + t.amount;
-        return acc;
-      }, {} as Record<string, number>)
-  ).map(([name, value]) => ({ name, value }));
 
   const budgetProgress = budgets.map(b => {
     const spent = transactions
