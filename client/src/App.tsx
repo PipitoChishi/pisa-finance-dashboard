@@ -21,6 +21,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import { Analytics } from '@vercel/analytics/react';
 import './App.css';
 
 interface Transaction {
@@ -108,9 +109,11 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
   ).map(([name, value]) => ({ name, value }));
 
   return (
-    <div className="dashboard-container">
-      {/* Sidebar */}
-      <aside className="sidebar">
+    <>
+      <Analytics />
+      <div className="dashboard-container">
+        {/* Sidebar */}
+        <aside className="sidebar">
         <h2 style={{ color: '#10b981', marginBottom: '2.5rem' }}>Pisa Finance</h2>
         <nav className="sidebar-nav">
           <a href="#" className="nav-item active"><LayoutDashboard size={20} /> Dashboard</a>
@@ -180,7 +183,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {pieData.map((entry, index) => (
+                  {pieData.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -227,7 +230,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
             <form onSubmit={handleSubmit}>
               <select 
                 value={formData.type} 
-                onChange={e => setFormData({...formData, type: e.target.value as any})}
+                onChange={e => setFormData({...formData, type: e.target.value as 'income' | 'expense'})}
               >
                 <option value="expense">Expense</option>
                 <option value="income">Income</option>
@@ -264,7 +267,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 
