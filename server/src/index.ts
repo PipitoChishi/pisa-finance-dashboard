@@ -23,9 +23,6 @@ const globalLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use('/api', globalLimiter);
-app.get('/',  (req: any, res: any) => {
-  res.json({ status: 'OK', message: 'Pisa-finance tracker API is running' });
-});
 
 // Auth Rate Limiter
 const authLimiter = rateLimit({
@@ -47,16 +44,24 @@ const handleValidationErrors = (req: Request, res: Response, next: Function) => 
 // --- API Routes ---
 
 // Health Check
+app.get('/', (req: any, res: any) => {
+  res.json({ status: 'OK', message: 'Pisa-finance tracker API is running' });
+});
+
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'OK', message: 'Pisa-finance tracker API is running' });
 });
 
 // --- Transactions Endpoints ---
 app.get('/api/transactions', async (req: Request, res: Response) => {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .order('date', { ascending: false });
+  const { month } = req.query;
+  let query = supabase.from('transactions').select('*');
+  
+  if (month) {
+    query = query.eq('month', month);
+  }
+
+  const { data, error } = await query.order('date', { ascending: false });
   
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
@@ -69,14 +74,15 @@ app.post(
     body('category').isString().trim().escape().notEmpty(),
     body('amount').isNumeric().withMessage('Amount must be a number'),
     body('date').isString().trim().escape().notEmpty(),
+    body('month').isString().trim().escape().notEmpty(),
     body('description').optional({ checkFalsy: true }).isString().trim().escape(),
     handleValidationErrors
   ],
   async (req: Request, res: Response) => {
-    const { type, category, amount, date, description } = req.body;
+    const { type, category, amount, date, description, month } = req.body;
     const { data, error } = await supabase
       .from('transactions')
-      .insert([{ type, category, amount, date, description }])
+      .insert([{ type, category, amount, date, description, month }])
       .select();
     
     if (error) return res.status(500).json({ error: error.message });
@@ -86,7 +92,14 @@ app.post(
 
 // --- Budgets Endpoints ---
 app.get('/api/budgets', async (req: Request, res: Response) => {
-  const { data, error } = await supabase.from('budgets').select('*');
+  const { month } = req.query;
+  let query = supabase.from('budgets').select('*');
+  
+  if (month) {
+    query = query.eq('month', month);
+  }
+
+  const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -96,40 +109,14 @@ app.post(
   [
     body('category').isString().trim().escape().notEmpty(),
     body('monthly_limit').isNumeric().withMessage('Monthly limit must be a number'),
+    body('month').isString().trim().escape().notEmpty(),
     handleValidationErrors
   ],
   async (req: Request, res: Response) => {
-    const { category, monthly_limit } = req.body;
+    const { category, monthly_limit, month } = req.body;
     const { data, error } = await supabase
       .from('budgets')
-      .upsert({ category, monthly_limit }, { onConflict: 'category' })
-      .select();
-    
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ id: data?.[0]?.id, success: true });
-  }
-);
-
-// --- Goals Endpoints ---
-app.get('/api/goals', async (req: Request, res: Response) => {
-  const { data, error } = await supabase.from('goals').select('*');
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
-
-app.post(
-  '/api/goals',
-  [
-    body('name').isString().trim().escape().notEmpty(),
-    body('target_amount').isNumeric().withMessage('Target amount must be a number'),
-    body('current_amount').optional().isNumeric(),
-    handleValidationErrors
-  ],
-  async (req: Request, res: Response) => {
-    const { name, target_amount, current_amount } = req.body;
-    const { data, error } = await supabase
-      .from('goals')
-      .insert([{ name, target_amount, current_amount: current_amount || 0 }])
+      .upsert({ category, monthly_limit, month }, { onConflict: 'category,month' })
       .select();
     
     if (error) return res.status(500).json({ error: error.message });
