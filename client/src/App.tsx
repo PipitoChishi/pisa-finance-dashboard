@@ -3,13 +3,12 @@ import {
   LayoutDashboard, 
   Target, 
   History, 
-  Plus,
-  X,
-  LogOut,
-  Wallet,
-  TrendingUp,
+  Plus, 
+  X, 
+  LogOut, 
+  Wallet, 
+  TrendingUp, 
   TrendingDown,
-  Calendar,
   BarChart3
 } from 'lucide-react';
 import { 
@@ -89,18 +88,24 @@ function App() {
   const fetchData = async () => {
     if (!session) return;
     try {
+      console.log(`Fetching from: ${API_URL}`);
       const [transRes, budgetRes, allTransRes] = await Promise.all([
         fetch(`${API_URL}/api/transactions?month=${selectedMonth}`),
         fetch(`${API_URL}/api/budgets?month=${selectedMonth}`),
         fetch(`${API_URL}/api/transactions`)
       ]);
+
+      if (!transRes.ok || !budgetRes.ok) {
+        throw new Error('Failed to fetch data from server');
+      }
+
       const transData = await transRes.json();
       const budgetData = await budgetRes.json();
       const allData = await allTransRes.json();
       setTransactions(transData);
       setBudgets(budgetData);
       setAllTransactions(allData);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching data:', err);
     }
   };
@@ -123,6 +128,8 @@ function App() {
 
   const handleTransactionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Submitting transaction to:', `${API_URL}/api/transactions`);
+    
     fetch(`${API_URL}/api/transactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -132,6 +139,13 @@ function App() {
         month: selectedMonth
       })
     })
+    .then(async (res) => {
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.errors?.[0]?.msg || 'Failed to save transaction');
+      }
+      return res.json();
+    })
     .then(() => {
       setShowModal(false);
       fetchData();
@@ -139,11 +153,17 @@ function App() {
         type: 'expense', category: '', amount: '',
         date: new Date().toISOString().split('T')[0], description: ''
       });
+    })
+    .catch(err => {
+      console.error('Submit Error:', err);
+      alert(`Error: ${err.message}. Check if your Backend URL is correct in Vercel settings.`);
     });
   };
 
   const handleBudgetSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Submitting budget to:', `${API_URL}/api/budgets`);
+
     fetch(`${API_URL}/api/budgets`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -153,10 +173,21 @@ function App() {
         month: selectedMonth
       })
     })
+    .then(async (res) => {
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.errors?.[0]?.msg || 'Failed to save budget');
+      }
+      return res.json();
+    })
     .then(() => {
       setShowBudgetModal(false);
       fetchData();
       setBudgetFormData({ category: '', monthly_limit: '' });
+    })
+    .catch(err => {
+      console.error('Budget Error:', err);
+      alert(`Error: ${err.message}. Check if your Backend URL is correct in Vercel settings.`);
     });
   };
 
