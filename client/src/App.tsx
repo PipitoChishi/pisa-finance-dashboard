@@ -43,8 +43,10 @@ function App() {
     description: ''
   });
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
   const fetchData = () => {
-    fetch('http://localhost:3001/api/transactions')
+    fetch(`${API_URL}/api/transactions`)
       .then(res => res.json())
       .then(data => setTransactions(data));
   };
@@ -260,14 +262,6 @@ function App() {
               </div>
             </form>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default App;
-    </div>
         </div>
       )}
     </div>
