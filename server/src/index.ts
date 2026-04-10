@@ -23,7 +23,7 @@ const globalLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use('/api', globalLimiter);
-napp.get('/', (req, res) => {
+app.get('/',  (req: any, res: any) => {
   res.json({ status: 'OK', message: 'Pisa-finance tracker API is running' });
 });
 
