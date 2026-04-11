@@ -102,7 +102,7 @@ function App() {
       setBudgets(Array.isArray(budgetData) ? budgetData : []);
       setAllTransactions(Array.isArray(allData) ? allData : []);
     } catch (err) {
-      console.error('Fetch error:', err);
+      console.error(err);
     }
   };
 
@@ -113,14 +113,10 @@ function App() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthMsg('');
-    
     if (authMode === 'signup') {
       const { error } = await supabase.auth.signUp(authData);
-      if (error) {
-        setAuthMsg(error.message);
-      } else {
-        setAuthMsg('Success! Please check your email to confirm your account.');
-      }
+      if (error) setAuthMsg(error.message);
+      else setAuthMsg('Success! Check your email to confirm.');
     } else {
       const { error } = await supabase.auth.signInWithPassword(authData);
       if (error) setAuthMsg(error.message);
@@ -135,7 +131,6 @@ function App() {
     e.preventDefault();
     const method = editingItem ? 'PUT' : 'POST';
     const url = editingItem ? `${API_URL}/api/transactions/${editingItem.id}` : `${API_URL}/api/transactions`;
-
     fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
@@ -143,18 +138,14 @@ function App() {
         ...formData,
         user_id: session.user.id,
         amount: Math.abs(parseFloat(formData.amount)),
-        month: selectedMonth,
-        date: formData.date || new Date().toISOString().split('T')[0]
+        month: selectedMonth
       })
-    })
-    .then(async (res) => {
-      if (!res.ok) throw new Error('Save failed');
+    }).then(() => {
       setShowModal(false);
       setEditingItem(null);
       fetchData();
       setFormData({ category: '', amount: '', date: new Date().toISOString().split('T')[0], description: '' });
-    })
-    .catch(err => alert(err.message));
+    });
   };
 
   const handleQuickAdd = (e: React.FormEvent) => {
@@ -171,14 +162,11 @@ function App() {
         date: new Date().toISOString().split('T')[0],
         description: 'Quick Add'
       })
-    })
-    .then(async (res) => {
-      if (!res.ok) throw new Error('Quick add failed');
+    }).then(() => {
       setShowQuickAdd(null);
       setQuickAddAmount('');
       fetchData();
-    })
-    .catch(err => alert(err.message));
+    });
   };
 
   const handleBudgetSubmit = (e: React.FormEvent) => {
@@ -192,14 +180,11 @@ function App() {
         monthly_limit: Math.abs(parseFloat(budgetFormData.monthly_limit)),
         month: selectedMonth
       })
-    })
-    .then(async (res) => {
-      if (!res.ok) throw new Error('Budget save failed');
+    }).then(() => {
       setShowBudgetModal(false);
       fetchData();
       setBudgetFormData({ category: '', monthly_limit: '' });
-    })
-    .catch(err => alert(err.message));
+    });
   };
 
   const handleDelete = (type: 'transaction' | 'budget', id: number) => {
@@ -211,12 +196,7 @@ function App() {
 
   const startEdit = (item: Transaction) => {
     setEditingItem(item);
-    setFormData({
-      category: item.category,
-      amount: item.amount.toString(),
-      date: item.date,
-      description: item.description || ''
-    });
+    setFormData({ category: item.category, amount: item.amount.toString(), date: item.date, description: item.description || '' });
     setShowModal(true);
   };
 
@@ -227,22 +207,19 @@ function App() {
 
   if (loading) return <div className="loading">Loading...</div>;
 
+  // --- RENDER LOGIN PAGE ---
   if (!session) {
     return (
-      <div className="auth-container">
-        <div className="glass-card auth-card">
+      <div className="auth-page">
+        <div className="auth-card glass-card">
           <h2 style={{ textAlign: 'center', color: '#10b981' }}>Pisa Finance</h2>
-          {authMsg && (
-            <div className={authMsg.includes('Success') ? 'error-msg' : 'error-msg'} style={{ background: authMsg.includes('Success') ? 'rgba(16, 185, 129, 0.1)' : '', color: authMsg.includes('Success') ? '#10b981' : '', borderColor: authMsg.includes('Success') ? 'rgba(16, 185, 129, 0.2)' : '' }}>
-              {authMsg}
-            </div>
-          )}
+          {authMsg && <div className="error-msg">{authMsg}</div>}
           <form onSubmit={handleAuth}>
             <input type="email" placeholder="Email" required value={authData.email} onChange={e => setAuthData({...authData, email: e.target.value})} />
             <input type="password" placeholder="Password" required value={authData.password} onChange={e => setAuthData({...authData, password: e.target.value})} />
             <button type="submit" className="glass-card btn-primary">{authMode === 'login' ? 'Login' : 'Sign Up'}</button>
           </form>
-          <p style={{ textAlign: 'center', marginTop: '1rem', cursor: 'pointer', color: '#94a3b8' }} onClick={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setAuthMsg(''); }}>
+          <p style={{ textAlign: 'center', marginTop: '1.5rem', cursor: 'pointer', color: '#94a3b8' }} onClick={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setAuthMsg(''); }}>
             {authMode === 'login' ? "Don't have an account? Sign Up" : "Already have an account? Login"}
           </p>
         </div>
@@ -250,25 +227,17 @@ function App() {
     );
   }
 
+  // --- RENDER DASHBOARD ---
   const totalMonthlyBudget = budgets.reduce((acc, b) => acc + b.monthly_limit, 0);
   const totalMonthlyExpenses = transactions.reduce((acc, t) => acc + t.amount, 0);
   const remainingFunds = totalMonthlyBudget - totalMonthlyExpenses;
   const budgetSafety = totalMonthlyBudget > 0 ? Math.max(0, (remainingFunds / totalMonthlyBudget) * 100).toFixed(1) : 0;
 
-  const pieData = Object.entries(
-    transactions.reduce((acc, t) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount;
-      return acc;
-    }, {} as Record<string, number>)
-  ).map(([name, value]) => ({ name, value }));
-
+  const pieData = Object.entries(transactions.reduce((acc, t) => { acc[t.category] = (acc[t.category] || 0) + t.amount; return acc; }, {} as Record<string, number>)).map(([name, value]) => ({ name, value }));
   const budgetProgress = budgets.map(b => {
-    const spent = transactions
-      .filter(t => t.category.toLowerCase() === b.category.toLowerCase())
-      .reduce((acc, t) => acc + t.amount, 0);
+    const spent = transactions.filter(t => t.category.toLowerCase() === b.category.toLowerCase()).reduce((acc, t) => acc + t.amount, 0);
     return { id: b.id, name: b.category, spent, limit: b.monthly_limit };
   });
-
   const uniqueCategories = Array.from(new Set(allTransactions.map(t => t.category)));
   const formatMoney = (val: number) => `${currency}${Math.abs(val).toLocaleString()}`;
 
@@ -302,24 +271,11 @@ function App() {
         {view === 'dashboard' && (
           <div className="view-content">
             <div className="stats-grid">
-              <div className="glass-card">
-                <div className="stat-label">Monthly Allowance</div>
-                <div className="stat-value"><Wallet size={20} color="#3b82f6" /> {formatMoney(totalMonthlyBudget)}</div>
-              </div>
-              <div className="glass-card">
-                <div className="stat-label">Total Spent</div>
-                <div className="stat-value" style={{ color: '#f43f5e' }}><TrendingDown size={20} /> {formatMoney(totalMonthlyExpenses)}</div>
-              </div>
-              <div className="glass-card">
-                <div className="stat-label">Remaining Funds</div>
-                <div className="stat-value" style={{ color: '#10b981' }}><TrendingUp size={20} /> {formatMoney(remainingFunds)}</div>
-              </div>
-              <div className="glass-card">
-                <div className="stat-label">Budget Safety</div>
-                <div className="stat-value">{budgetSafety}%</div>
-              </div>
+              <div className="glass-card"><div className="stat-label">Monthly Allowance</div><div className="stat-value"><Wallet size={20} color="#3b82f6" /> {formatMoney(totalMonthlyBudget)}</div></div>
+              <div className="glass-card"><div className="stat-label">Total Spent</div><div className="stat-value" style={{ color: '#f43f5e' }}><TrendingDown size={20} /> {formatMoney(totalMonthlyExpenses)}</div></div>
+              <div className="glass-card"><div className="stat-label">Remaining Funds</div><div className="stat-value" style={{ color: '#10b981' }}><TrendingUp size={20} /> {formatMoney(remainingFunds)}</div></div>
+              <div className="glass-card"><div className="stat-label">Budget Safety</div><div className="stat-value">{budgetSafety}%</div></div>
             </div>
-
             <div className="charts-grid">
               <div className="glass-card chart-container">
                 <h3>Expense Breakdown</h3>
@@ -338,16 +294,10 @@ function App() {
                   {budgetProgress.map(b => (
                     <div key={b.name} className="budget-item">
                       <div className="budget-item-info">
-                        <div style={{ display:'flex', gap:'8px', alignItems:'center'}}>
-                          <span>{b.name}</span>
-                          <Trash2 size={14} style={{cursor:'pointer', color:'#f43f5e'}} onClick={() => handleDelete('budget', b.id)} />
-                          <PlusCircle size={16} style={{cursor:'pointer', color:'#3b82f6'}} onClick={() => setShowQuickAdd(b.name)} />
-                        </div>
+                        <div style={{ display:'flex', gap:'8px', alignItems:'center'}}><span>{b.name}</span><Trash2 size={14} style={{cursor:'pointer', color:'#f43f5e'}} onClick={() => handleDelete('budget', b.id)} /><PlusCircle size={16} style={{cursor:'pointer', color:'#3b82f6'}} onClick={() => setShowQuickAdd(b.name)} /></div>
                         <span style={{ color: b.spent > b.limit ? '#f43f5e' : '#10b981' }}>{formatMoney(b.spent)} / {formatMoney(b.limit)}</span>
                       </div>
-                      <div className="progress-bar">
-                        <div className="progress-fill" style={{ width: `${Math.min(100, (b.spent / b.limit) * 100)}%`, backgroundColor: b.spent > b.limit ? '#f43f5e' : '#10b981' }}></div>
-                      </div>
+                      <div className="progress-bar"><div className="progress-fill" style={{ width: `${Math.min(100, (b.spent / b.limit) * 100)}%`, backgroundColor: b.spent > b.limit ? '#f43f5e' : '#10b981' }}></div></div>
                     </div>
                   ))}
                 </div>
@@ -360,23 +310,12 @@ function App() {
           <div className="glass-card">
             <h3>Expense History - {selectedMonth}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {transactions.length === 0 ? <p>No expenses recorded.</p> : 
-                transactions.map(t => (
-                  <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', alignItems: 'center' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 'bold' }}>{t.category}</div>
-                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{t.date} - {t.description}</div>
-                    </div>
-                    <div style={{ display:'flex', gap:'1.5rem', alignItems:'center' }}>
-                      <div style={{ color: '#f43f5e', fontWeight: 'bold' }}>{formatMoney(t.amount)}</div>
-                      <div style={{ display:'flex', gap:'0.75rem' }}>
-                        <Edit2 size={18} style={{cursor:'pointer', color:'#3b82f6'}} onClick={() => startEdit(t)} />
-                        <Trash2 size={18} style={{cursor:'pointer', color:'#f43f5e'}} onClick={() => handleDelete('transaction', t.id)} />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              }
+              {transactions.length === 0 ? <p>No expenses recorded.</p> : transactions.map(t => (
+                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}><div style={{ fontWeight: 'bold' }}>{t.category}</div><div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{t.date} - {t.description}</div></div>
+                  <div style={{ display:'flex', gap:'1.5rem', alignItems:'center' }}><div style={{ color: '#f43f5e', fontWeight: 'bold' }}>{formatMoney(t.amount)}</div><div style={{ display:'flex', gap:'0.75rem' }}><Edit2 size={18} style={{cursor:'pointer', color:'#3b82f6'}} onClick={() => startEdit(t)} /><Trash2 size={18} style={{cursor:'pointer', color:'#f43f5e'}} onClick={() => handleDelete('transaction', t.id)} /></div></div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -386,15 +325,8 @@ function App() {
             <div className="glass-card" style={{ height: '450px' }}>
               <h3>Yearly Expenses ({currency})</h3>
               <ResponsiveContainer width="100%" height="90%">
-                <BarChart data={MONTHS.map(m => {
-                  const monthTrans = allTransactions.filter(t => t.month === m);
-                  return { name: m.substring(0, 3), expense: monthTrans.reduce((acc, t) => acc + t.amount, 0) };
-                })}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="name" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
-                  <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '8px' }} />
-                  <Bar dataKey="expense" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                <BarChart data={MONTHS.map(m => { const monthTrans = allTransactions.filter(t => t.month === m); return { name: m.substring(0, 3), expense: monthTrans.reduce((acc, t) => acc + t.amount, 0) }; })}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" /><XAxis dataKey="name" stroke="#94a3b8" /><YAxis stroke="#94a3b8" /><Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '8px' }} /><Bar dataKey="expense" fill="#f43f5e" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -404,73 +336,33 @@ function App() {
         {view === 'settings' && (
           <div className="glass-card" style={{ maxWidth: '400px' }}>
             <h3>Settings</h3>
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>Preferred Currency</label>
-              <select className="month-selector" style={{ width: '100%' }} value={currency} onChange={(e) => updateCurrency(e.target.value)}>
-                {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
+            <div style={{ marginBottom: '1.5rem' }}><label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>Preferred Currency</label><select className="month-selector" style={{ width: '100%' }} value={currency} onChange={(e) => updateCurrency(e.target.value)}>{CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
           </div>
         )}
       </main>
 
-      <datalist id="categories">
-        {uniqueCategories.map(cat => <option key={cat} value={cat} />)}
-      </datalist>
+      <datalist id="categories">{uniqueCategories.map(cat => <option key={cat} value={cat} />)}</datalist>
 
-      {/* Expense Modal */}
       {showModal && (
         <div className="modal-overlay">
           <div className="glass-card modal-content">
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
-              <h2>{editingItem ? 'Edit Expense' : 'Add Expense'}</h2>
-              <X size={24} style={{cursor:'pointer'}} onClick={() => { setShowModal(false); setEditingItem(null); }} />
-            </div>
-            <form onSubmit={handleTransactionSubmit}>
-              <input list="categories" placeholder="Category (e.g. Food)" required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
-              <input type="number" step="0.01" placeholder="Amount" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
-              <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-              <textarea placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
-              <div className="button-group">
-                <button type="submit" className="glass-card btn-primary">Save Entry</button>
-              </div>
-            </form>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}><h2>{editingItem ? 'Edit Expense' : 'Add Expense'}</h2><X size={24} style={{cursor:'pointer'}} onClick={() => { setShowModal(false); setEditingItem(null); }} /></div>
+            <form onSubmit={handleTransactionSubmit}><input list="categories" placeholder="Category" required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} /><input type="number" step="0.01" placeholder="Amount" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /><textarea placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /><div className="button-group"><button type="submit" className="glass-card btn-primary">Save Entry</button></div></form>
           </div>
         </div>
       )}
 
-      {/* Quick Add Modal */}
       {showQuickAdd && (
         <div className="modal-overlay">
-          <div className="glass-card modal-content" style={{maxWidth:'350px'}}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
-              <h2>Quick Add: {showQuickAdd}</h2>
-              <X size={24} style={{cursor:'pointer'}} onClick={() => setShowQuickAdd(null)} />
-            </div>
-            <form onSubmit={handleQuickAdd}>
-              <input type="number" step="0.01" placeholder="Amount" autoFocus required value={quickAddAmount} onChange={e => setQuickAddAmount(e.target.value)} />
-              <div className="button-group">
-                <button type="submit" className="glass-card btn-primary">Add</button>
-              </div>
-            </form>
-          </div>
+          <div className="glass-card modal-content" style={{maxWidth:'350px'}}><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}><h2>Quick Add: {showQuickAdd}</h2><X size={24} style={{cursor:'pointer'}} onClick={() => setShowQuickAdd(null)} /></div><form onSubmit={handleQuickAdd}><input type="number" step="0.01" placeholder="Amount" autoFocus required value={quickAddAmount} onChange={e => setQuickAddAmount(e.target.value)} /><div className="button-group"><button type="submit" className="glass-card btn-primary">Add</button></div></form></div>
         </div>
       )}
 
       {showBudgetModal && (
         <div className="modal-overlay">
           <div className="glass-card modal-content">
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
-              <h2>Set Category Limit</h2>
-              <X size={24} style={{cursor:'pointer'}} onClick={() => setShowBudgetModal(false)} />
-            </div>
-            <form onSubmit={handleBudgetSubmit}>
-              <input list="categories" placeholder="Category" required value={budgetFormData.category} onChange={e => setBudgetFormData({...budgetFormData, category: e.target.value})} />
-              <input type="number" step="0.01" placeholder="Limit Amount" required value={budgetFormData.monthly_limit} onChange={e => setBudgetFormData({...budgetFormData, monthly_limit: e.target.value})} />
-              <div className="button-group">
-                <button type="submit" className="glass-card btn-primary">Save Limit</button>
-              </div>
-            </form>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}><h2>Set Category Limit</h2><X size={24} style={{cursor:'pointer'}} onClick={() => setShowBudgetModal(false)} /></div>
+            <form onSubmit={handleBudgetSubmit}><input list="categories" placeholder="Category" required value={budgetFormData.category} onChange={e => setBudgetFormData({...budgetFormData, category: e.target.value})} /><input type="number" step="0.01" placeholder="Limit Amount" required value={budgetFormData.monthly_limit} onChange={e => setBudgetFormData({...budgetFormData, monthly_limit: e.target.value})} /><div className="button-group"><button type="submit" className="glass-card btn-primary">Save Limit</button></div></form>
           </div>
         </div>
       )}
