@@ -8,7 +8,8 @@ import {
   Wallet, 
   TrendingUp, 
   TrendingDown,
-  BarChart3
+  BarChart3,
+  Settings
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -50,12 +51,15 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 const COLORS = ['#10b981', '#3b82f6', '#f43f5e', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899'];
+const CURRENCIES = ['$', '₹', '£', '€', '¥', '₦', 'GH₵'];
 
 function App() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'dashboard' | 'history' | 'budgets' | 'yearly'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'history' | 'budgets' | 'yearly' | 'settings'>('dashboard');
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[new Date().getMonth()]);
+  const [currency, setCurrency] = useState(localStorage.getItem('pisa_currency') || '$');
+  
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
@@ -97,9 +101,7 @@ function App() {
         fetch(`${API_URL}/api/transactions`)
       ]);
 
-      if (!transRes.ok || !budgetRes.ok) {
-        throw new Error('Failed to fetch data');
-      }
+      if (!transRes.ok || !budgetRes.ok) throw new Error('Failed to fetch data');
 
       const transData = await transRes.json();
       const budgetData = await budgetRes.json();
@@ -171,6 +173,11 @@ function App() {
     .catch(err => alert(err.message));
   };
 
+  const updateCurrency = (cur: string) => {
+    setCurrency(cur);
+    localStorage.setItem('pisa_currency', cur);
+  };
+
   if (loading) return <div className="loading">Loading...</div>;
 
   if (!session) {
@@ -197,7 +204,6 @@ function App() {
   const currentMonthBalance = currentMonthIncome - currentMonthExpense;
   const currentSavingsRate = currentMonthIncome > 0 ? ((currentMonthIncome - currentMonthExpense) / currentMonthIncome * 100).toFixed(1) : 0;
 
-  // Pie Chart Data
   const pieData = Object.entries(
     transactions
       .filter(t => t.type === 'expense')
@@ -207,7 +213,6 @@ function App() {
       }, {} as Record<string, number>)
   ).map(([name, value]) => ({ name, value }));
 
-  // Budget Calculations
   const budgetProgress = budgets.map(b => {
     const spent = transactions
       .filter(t => t.type === 'expense' && t.category.toLowerCase() === b.category.toLowerCase())
@@ -215,16 +220,16 @@ function App() {
     return { name: b.category, spent, limit: b.monthly_limit };
   });
 
-  // Unique Categories for Memory (Datalist)
   const uniqueCategories = Array.from(new Set(allTransactions.map(t => t.category)));
 
-  // Yearly Summary Data
   const yearlyData = MONTHS.map(m => {
     const monthTrans = allTransactions.filter(t => t.month === m);
     const income = monthTrans.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
     const expense = monthTrans.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
     return { name: m.substring(0, 3), income, expense };
   });
+
+  const formatMoney = (val: number) => `${currency}${val.toLocaleString()}`;
 
   return (
     <div className="dashboard-container">
@@ -234,6 +239,7 @@ function App() {
           <div className={`nav-item ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}><LayoutDashboard size={20} /> Dashboard</div>
           <div className={`nav-item ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}><History size={20} /> History</div>
           <div className={`nav-item ${view === 'yearly' ? 'active' : ''}`} onClick={() => setView('yearly')}><BarChart3 size={20} /> Yearly View</div>
+          <div className={`nav-item ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}><Settings size={20} /> Settings</div>
           <div className="nav-item" onClick={handleLogout} style={{ marginTop: 'auto' }}><LogOut size={20} /> Logout</div>
         </nav>
       </aside>
@@ -241,10 +247,12 @@ function App() {
       <main className="main-content">
         <header className="main-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <h1>{selectedMonth} Overview</h1>
-            <select className="month-selector" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
-              {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
+            <h1>{view.charAt(0).toUpperCase() + view.slice(1)}</h1>
+            {view === 'dashboard' && (
+              <select className="month-selector" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+                {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button onClick={() => setShowBudgetModal(true)} className="glass-card btn-outline">Set Budget</button>
@@ -257,15 +265,15 @@ function App() {
             <div className="stats-grid">
               <div className="glass-card">
                 <div className="stat-label">Month Balance</div>
-                <div className="stat-value"><Wallet size={20} color="#3b82f6" /> ${currentMonthBalance.toLocaleString()}</div>
+                <div className="stat-value"><Wallet size={20} color="#3b82f6" /> {formatMoney(currentMonthBalance)}</div>
               </div>
               <div className="glass-card">
                 <div className="stat-label">Month Expenses</div>
-                <div className="stat-value" style={{ color: '#f43f5e' }}><TrendingDown size={20} /> ${currentMonthExpense.toLocaleString()}</div>
+                <div className="stat-value" style={{ color: '#f43f5e' }}><TrendingDown size={20} /> {formatMoney(currentMonthExpense)}</div>
               </div>
               <div className="glass-card">
                 <div className="stat-label">Month Income</div>
-                <div className="stat-value" style={{ color: '#10b981' }}><TrendingUp size={20} /> ${currentMonthIncome.toLocaleString()}</div>
+                <div className="stat-value" style={{ color: '#10b981' }}><TrendingUp size={20} /> {formatMoney(currentMonthIncome)}</div>
               </div>
               <div className="glass-card">
                 <div className="stat-label">Savings Rate</div>
@@ -278,16 +286,8 @@ function App() {
                 <h3>Expense Distribution</h3>
                 <ResponsiveContainer width="100%" height="85%">
                   <PieChart>
-                    <Pie
-                      data={pieData.length > 0 ? pieData : [{name: 'No data', value: 1}]}
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {pieData.map((_entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
+                    <Pie data={pieData.length > 0 ? pieData : [{name: 'No data', value: 1}]} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                      {pieData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                     </Pie>
                     <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '8px' }} />
                   </PieChart>
@@ -300,7 +300,7 @@ function App() {
                     <div key={b.name} className="budget-item">
                       <div className="budget-item-info">
                         <span>{b.name}</span>
-                        <span style={{ color: b.spent > b.limit ? '#f43f5e' : '#10b981' }}>${b.spent} / ${b.limit}</span>
+                        <span style={{ color: b.spent > b.limit ? '#f43f5e' : '#10b981' }}>{formatMoney(b.spent)} / {formatMoney(b.limit)}</span>
                       </div>
                       <div className="progress-bar">
                         <div className="progress-fill" style={{ width: `${Math.min(100, (b.spent / b.limit) * 100)}%`, backgroundColor: b.spent > b.limit ? '#f43f5e' : '#10b981' }}></div>
@@ -317,7 +317,7 @@ function App() {
         {view === 'yearly' && (
           <div className="view-content">
             <div className="glass-card" style={{ height: '450px' }}>
-              <h3>Yearly Performance</h3>
+              <h3>Yearly Performance ({currency})</h3>
               <ResponsiveContainer width="100%" height="90%">
                 <BarChart data={yearlyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -344,12 +344,25 @@ function App() {
                       <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{t.date} - {t.description}</div>
                     </div>
                     <div style={{ color: t.type === 'income' ? '#10b981' : '#f43f5e', fontWeight: 'bold' }}>
-                      {t.type === 'income' ? '+' : '-'}${t.amount}
+                      {t.type === 'income' ? '+' : '-'}{formatMoney(t.amount)}
                     </div>
                   </div>
                 ))
               }
             </div>
+          </div>
+        )}
+
+        {view === 'settings' && (
+          <div className="glass-card" style={{ maxWidth: '400px' }}>
+            <h3>Settings</h3>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>Preferred Currency</label>
+              <select className="month-selector" style={{ width: '100%' }} value={currency} onChange={(e) => updateCurrency(e.target.value)}>
+                {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>More settings coming soon...</p>
           </div>
         )}
       </main>
@@ -369,7 +382,7 @@ function App() {
                 <option value="income">Income</option>
               </select>
               <input list="categories" placeholder="Category" required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
-              <input type="number" placeholder="Amount" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+              <input type="number" step="0.01" placeholder="Amount" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
               <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
               <textarea placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
               <div className="button-group">
@@ -387,7 +400,7 @@ function App() {
             <h2>Set Budget</h2>
             <form onSubmit={handleBudgetSubmit}>
               <input list="categories" placeholder="Category" required value={budgetFormData.category} onChange={e => setBudgetFormData({...budgetFormData, category: e.target.value})} />
-              <input type="number" placeholder="Monthly Limit" required value={budgetFormData.monthly_limit} onChange={e => setBudgetFormData({...budgetFormData, monthly_limit: e.target.value})} />
+              <input type="number" step="0.01" placeholder="Monthly Limit" required value={budgetFormData.monthly_limit} onChange={e => setBudgetFormData({...budgetFormData, monthly_limit: e.target.value})} />
               <div className="button-group">
                 <button type="button" className="glass-card btn-secondary" onClick={() => setShowBudgetModal(false)}>Cancel</button>
                 <button type="submit" className="glass-card btn-primary">Save Budget</button>
