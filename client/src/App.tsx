@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   LayoutDashboard, 
-   
+  Target, 
   History, 
   Plus, 
   LogOut, 
@@ -9,11 +9,13 @@ import {
   TrendingUp, 
   TrendingDown,
   BarChart3,
-  Settings
+  Settings,
+  Link as LinkIcon,
+  RefreshCw
 } from 'lucide-react';
 import { 
-   
-   
+  LineChart, 
+  Line, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -25,6 +27,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import { usePlaidLink } from 'react-plaid-link';
 import { supabase } from './supabase';
 import './App.css';
 
@@ -69,6 +72,9 @@ function App() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authData, setAuthData] = useState({ email: '', password: '' });
   
+  const [linkToken, setLinkToken] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
   const [formData, setFormData] = useState({
     type: 'expense',
     category: '',
@@ -93,12 +99,13 @@ function App() {
   }, []);
 
   const fetchData = async () => {
-    if (!session) return;
+    if (!session?.user?.id) return;
     try {
+      const userId = session.user.id;
       const [transRes, budgetRes, allTransRes] = await Promise.all([
-        fetch(`${API_URL}/api/transactions?month=${selectedMonth}`),
-        fetch(`${API_URL}/api/budgets?month=${selectedMonth}`),
-        fetch(`${API_URL}/api/transactions`)
+        fetch(`${API_URL}/api/transactions?month=${selectedMonth}&user_id=${userId}`),
+        fetch(`${API_URL}/api/budgets?month=${selectedMonth}&user_id=${userId}`),
+        fetch(`${API_URL}/api/transactions?user_id=${userId}`)
       ]);
 
       if (!transRes.ok || !budgetRes.ok) throw new Error('Failed to fetch data');
@@ -117,6 +124,54 @@ function App() {
   useEffect(() => {
     if (session) fetchData();
   }, [session, selectedMonth]);
+
+  // --- Plaid Integration ---
+  
+  const createLinkToken = useCallback(async () => {
+    if (!session?.user?.id) return;
+    const response = await fetch(`${API_URL}/api/create_link_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: session.user.id }),
+    });
+    const data = await response.json();
+    setLinkToken(data.link_token);
+  }, [session]);
+
+  const onPlaidSuccess = useCallback(async (public_token: string, metadata: any) => {
+    await fetch(`${API_URL}/api/exchange_public_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        public_token,
+        user_id: session.user.id,
+        institution_name: metadata.institution.name
+      }),
+    });
+    alert('Bank connected successfully!');
+    syncTransactions();
+  }, [session]);
+
+  const { open, ready } = usePlaidLink({
+    token: linkToken,
+    onSuccess: onPlaidSuccess,
+  });
+
+  const syncTransactions = async () => {
+    if (!session?.user?.id) return;
+    setSyncing(true);
+    try {
+      await fetch(`${API_URL}/api/sync_transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: session.user.id }),
+      });
+      fetchData();
+    } catch (err) {
+      console.error('Sync error:', err);
+    }
+    setSyncing(false);
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,6 +192,7 @@ function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...formData,
+        user_id: session.user.id,
         amount: parseFloat(formData.amount),
         month: selectedMonth
       })
@@ -159,6 +215,7 @@ function App() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        user_id: session.user.id,
         category: budgetFormData.category,
         monthly_limit: parseFloat(budgetFormData.monthly_limit),
         month: selectedMonth
@@ -240,7 +297,11 @@ function App() {
           <div className={`nav-item ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}><History size={20} /> History</div>
           <div className={`nav-item ${view === 'yearly' ? 'active' : ''}`} onClick={() => setView('yearly')}><BarChart3 size={20} /> Yearly View</div>
           <div className={`nav-item ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}><Settings size={20} /> Settings</div>
-          <div className="nav-item" onClick={handleLogout} style={{ marginTop: 'auto' }}><LogOut size={20} /> Logout</div>
+          
+          <div className="sidebar-footer" style={{ marginTop: 'auto' }}>
+            <div className="nav-item" onClick={() => { createLinkToken(); open(); }} style={{ color: '#3b82f6' }}><LinkIcon size={20} /> Connect Bank</div>
+            <div className="nav-item" onClick={handleLogout}><LogOut size={20} /> Logout</div>
+          </div>
         </nav>
       </aside>
 
@@ -255,6 +316,9 @@ function App() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
+            <button onClick={syncTransactions} disabled={syncing} className="glass-card btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <RefreshCw size={18} className={syncing ? 'spin' : ''} /> {syncing ? 'Syncing...' : 'Sync Bank'}
+            </button>
             <button onClick={() => setShowBudgetModal(true)} className="glass-card btn-outline">Set Budget</button>
             <button onClick={() => setShowModal(true)} className="glass-card btn-primary"><Plus size={20} /> Add Entry</button>
           </div>
