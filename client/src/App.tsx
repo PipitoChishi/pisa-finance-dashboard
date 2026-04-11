@@ -75,6 +75,18 @@ function App() {
   const [authData, setAuthData] = useState({ email: '', password: '' });
   const [authMsg, setAuthMsg] = useState('');
 
+  const [formData, setFormData] = useState({
+    category: '',
+    amount: '',
+    date: new Date().toISOString().split('T')[0],
+    description: ''
+  });
+  
+  const [budgetFormData, setBudgetFormData] = useState({
+    category: '',
+    monthly_limit: ''
+  });
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
