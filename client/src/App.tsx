@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
-   
+  Target, 
   History, 
   Plus, 
   LogOut, 
@@ -9,11 +9,12 @@ import {
   TrendingUp, 
   TrendingDown,
   BarChart3,
-  Settings
+  Settings,
+  PieChart as PieChartIcon
 } from 'lucide-react';
 import { 
-   
-   
+  LineChart, 
+  Line, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -139,7 +140,7 @@ function App() {
       body: JSON.stringify({
         ...formData,
         user_id: session.user.id,
-        amount: parseFloat(formData.amount),
+        amount: Math.abs(parseFloat(formData.amount)), // Ensure positive
         month: selectedMonth
       })
     })
@@ -163,7 +164,7 @@ function App() {
       body: JSON.stringify({
         user_id: session.user.id,
         category: budgetFormData.category,
-        monthly_limit: parseFloat(budgetFormData.monthly_limit),
+        monthly_limit: Math.abs(parseFloat(budgetFormData.monthly_limit)), // Ensure positive
         month: selectedMonth
       })
     })
@@ -201,38 +202,38 @@ function App() {
     );
   }
 
-  // Monthly Calculations
-  const currentMonthIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-  const currentMonthExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
-  const currentMonthBalance = currentMonthIncome - currentMonthExpense;
-  const currentSavingsRate = currentMonthIncome > 0 ? ((currentMonthIncome - currentMonthExpense) / currentMonthIncome * 100).toFixed(1) : 0;
+  // --- LOGIC UPDATES ---
+  
+  // 1. Month Balance = Total Budget Set
+  const totalMonthlyBudget = budgets.reduce((acc, b) => acc + b.monthly_limit, 0);
+  
+  // 2. Total Expense = Sum of all entries (Manual expenses)
+  const totalMonthlyExpenses = transactions.reduce((acc, t) => acc + t.amount, 0);
 
+  // 3. Savings Rate = ((Budget - Expense) / Budget) * 100
+  const savingsRate = totalMonthlyBudget > 0 
+    ? Math.max(0, ((totalMonthlyBudget - totalMonthlyExpenses) / totalMonthlyBudget) * 100).toFixed(1) 
+    : 0;
+
+  // Pie Chart Data
   const pieData = Object.entries(
-    transactions
-      .filter(t => t.type === 'expense')
-      .reduce((acc, t) => {
-        acc[t.category] = (acc[t.category] || 0) + t.amount;
-        return acc;
-      }, {} as Record<string, number>)
+    transactions.reduce((acc, t) => {
+      acc[t.category] = (acc[t.category] || 0) + t.amount;
+      return acc;
+    }, {} as Record<string, number>)
   ).map(([name, value]) => ({ name, value }));
 
+  // Budget Progress
   const budgetProgress = budgets.map(b => {
     const spent = transactions
-      .filter(t => t.type === 'expense' && t.category.toLowerCase() === b.category.toLowerCase())
+      .filter(t => t.category.toLowerCase() === b.category.toLowerCase())
       .reduce((acc, t) => acc + t.amount, 0);
     return { name: b.category, spent, limit: b.monthly_limit };
   });
 
   const uniqueCategories = Array.from(new Set(allTransactions.map(t => t.category)));
 
-  const yearlyData = MONTHS.map(m => {
-    const monthTrans = allTransactions.filter(t => t.month === m);
-    const income = monthTrans.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-    const expense = monthTrans.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
-    return { name: m.substring(0, 3), income, expense };
-  });
-
-  const formatMoney = (val: number) => `${currency}${val.toLocaleString()}`;
+  const formatMoney = (val: number) => `${currency}${Math.abs(val).toLocaleString()}`;
 
   return (
     <div className="dashboard-container">
@@ -253,16 +254,14 @@ function App() {
       <main className="main-content">
         <header className="main-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <h1>{view === 'dashboard' ? `${selectedMonth} Overview` : view.charAt(0).toUpperCase() + view.slice(1)}</h1>
-            {view === 'dashboard' && (
-              <select className="month-selector" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
-                {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            )}
+            <h1>{selectedMonth} Dashboard</h1>
+            <select className="month-selector" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+              {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <button onClick={() => setShowBudgetModal(true)} className="glass-card btn-outline">Set Budget</button>
-            <button onClick={() => setShowModal(true)} className="glass-card btn-primary"><Plus size={20} /> Add Entry</button>
+            <button onClick={() => setShowBudgetModal(true)} className="glass-card btn-outline">Set Monthly Limits</button>
+            <button onClick={() => setShowModal(true)} className="glass-card btn-primary"><Plus size={20} /> Add Expense</button>
           </div>
         </header>
 
@@ -270,29 +269,29 @@ function App() {
           <div className="view-content">
             <div className="stats-grid">
               <div className="glass-card">
-                <div className="stat-label">Month Balance</div>
-                <div className="stat-value"><Wallet size={20} color="#3b82f6" /> {formatMoney(currentMonthBalance)}</div>
+                <div className="stat-label">Allocated Budget</div>
+                <div className="stat-value"><Wallet size={20} color="#3b82f6" /> {formatMoney(totalMonthlyBudget)}</div>
               </div>
               <div className="glass-card">
-                <div className="stat-label">Month Expenses</div>
-                <div className="stat-value" style={{ color: '#f43f5e' }}><TrendingDown size={20} /> {formatMoney(currentMonthExpense)}</div>
+                <div className="stat-label">Total Spent</div>
+                <div className="stat-value" style={{ color: '#f43f5e' }}><TrendingDown size={20} /> {formatMoney(totalMonthlyExpenses)}</div>
               </div>
               <div className="glass-card">
-                <div className="stat-label">Month Income</div>
-                <div className="stat-value" style={{ color: '#10b981' }}><TrendingUp size={20} /> {formatMoney(currentMonthIncome)}</div>
+                <div className="stat-label">Remaining Funds</div>
+                <div className="stat-value" style={{ color: '#10b981' }}><TrendingUp size={20} /> {formatMoney(totalMonthlyBudget - totalMonthlyExpenses)}</div>
               </div>
               <div className="glass-card">
-                <div className="stat-label">Savings Rate</div>
-                <div className="stat-value">{currentSavingsRate}%</div>
+                <div className="stat-label">Budget Safety</div>
+                <div className="stat-value">{savingsRate}%</div>
               </div>
             </div>
 
             <div className="charts-grid">
               <div className="glass-card chart-container">
-                <h3>Expense Distribution</h3>
+                <h3>Expense Breakdown</h3>
                 <ResponsiveContainer width="100%" height="85%">
                   <PieChart>
-                    <Pie data={pieData.length > 0 ? pieData : [{name: 'No data', value: 1}]} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                    <Pie data={pieData.length > 0 ? pieData : [{name: 'Empty', value: 1}]} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
                       {pieData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                     </Pie>
                     <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '8px' }} />
@@ -300,7 +299,7 @@ function App() {
                 </ResponsiveContainer>
               </div>
               <div className="glass-card chart-container">
-                <h3>Item Expenses (Budgets)</h3>
+                <h3>Budget Limits Usage</h3>
                 <div className="budget-list">
                   {budgetProgress.map(b => (
                     <div key={b.name} className="budget-item">
@@ -313,48 +312,52 @@ function App() {
                       </div>
                     </div>
                   ))}
-                  {budgetProgress.length === 0 && <p style={{ color: '#94a3b8', textAlign: 'center' }}>No budgets set.</p>}
+                  {budgetProgress.length === 0 && <p style={{ color: '#94a3b8', textAlign: 'center' }}>No limits set for this month.</p>}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {view === 'yearly' && (
-          <div className="view-content">
-            <div className="glass-card" style={{ height: '450px' }}>
-              <h3>Yearly Performance ({currency})</h3>
-              <ResponsiveContainer width="100%" height="90%">
-                <BarChart data={yearlyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="name" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
-                  <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '8px' }} />
-                  <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expense" fill="#f43f5e" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
-
         {view === 'history' && (
           <div className="glass-card">
-            <h3>Transaction History - {selectedMonth}</h3>
+            <h3>Expense History - {selectedMonth}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {transactions.length === 0 ? <p>No entries found.</p> : 
+              {transactions.length === 0 ? <p>No expenses recorded.</p> : 
                 transactions.map(t => (
                   <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
                     <div>
                       <div style={{ fontWeight: 'bold' }}>{t.category}</div>
                       <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{t.date} - {t.description}</div>
                     </div>
-                    <div style={{ color: t.type === 'income' ? '#10b981' : '#f43f5e', fontWeight: 'bold' }}>
-                      {t.type === 'income' ? '+' : '-'}{formatMoney(t.amount)}
+                    <div style={{ color: '#f43f5e', fontWeight: 'bold' }}>
+                      {formatMoney(t.amount)}
                     </div>
                   </div>
                 ))
               }
+            </div>
+          </div>
+        )}
+
+        {/* ... (Yearly and Settings views remain same as before) ... */}
+        {view === 'yearly' && (
+          <div className="view-content">
+            <div className="glass-card" style={{ height: '450px' }}>
+              <h3>Yearly Budget vs Spent ({currency})</h3>
+              <ResponsiveContainer width="100%" height="90%">
+                <BarChart data={MONTHS.map(m => {
+                  const monthTrans = allTransactions.filter(t => t.month === m);
+                  const expense = monthTrans.reduce((acc, t) => acc + t.amount, 0);
+                  return { name: m.substring(0, 3), expense };
+                })}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="name" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: '8px' }} />
+                  <Bar dataKey="expense" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         )}
@@ -368,7 +371,6 @@ function App() {
                 {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>More settings coming soon...</p>
           </div>
         )}
       </main>
@@ -377,23 +379,18 @@ function App() {
         {uniqueCategories.map(cat => <option key={cat} value={cat} />)}
       </datalist>
 
-      {/* Modals */}
       {showModal && (
         <div className="modal-overlay">
           <div className="glass-card modal-content">
-            <h2>Add Entry</h2>
+            <h2>Add Expense Entry</h2>
             <form onSubmit={handleTransactionSubmit}>
-              <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as any})}>
-                <option value="expense">Expense</option>
-                <option value="income">Income</option>
-              </select>
-              <input list="categories" placeholder="Category" required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
+              <input list="categories" placeholder="Category (e.g. Food)" required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
               <input type="number" step="0.01" placeholder="Amount" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
               <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-              <textarea placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
+              <textarea placeholder="Optional description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
               <div className="button-group">
                 <button type="button" className="glass-card btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="glass-card btn-primary">Save</button>
+                <button type="submit" className="glass-card btn-primary">Save Entry</button>
               </div>
             </form>
           </div>
@@ -403,13 +400,13 @@ function App() {
       {showBudgetModal && (
         <div className="modal-overlay">
           <div className="glass-card modal-content">
-            <h2>Set Budget</h2>
+            <h2>Set Monthly Category Limit</h2>
             <form onSubmit={handleBudgetSubmit}>
-              <input list="categories" placeholder="Category" required value={budgetFormData.category} onChange={e => setBudgetFormData({...budgetFormData, category: e.target.value})} />
-              <input type="number" step="0.01" placeholder="Monthly Limit" required value={budgetFormData.monthly_limit} onChange={e => setBudgetFormData({...budgetFormData, monthly_limit: e.target.value})} />
+              <input list="categories" placeholder="Category (e.g. Rent)" required value={budgetFormData.category} onChange={e => setBudgetFormData({...budgetFormData, category: e.target.value})} />
+              <input type="number" step="0.01" placeholder="Limit Amount" required value={budgetFormData.monthly_limit} onChange={e => setBudgetFormData({...budgetFormData, monthly_limit: e.target.value})} />
               <div className="button-group">
                 <button type="button" className="glass-card btn-secondary" onClick={() => setShowBudgetModal(false)}>Cancel</button>
-                <button type="submit" className="glass-card btn-primary">Save Budget</button>
+                <button type="submit" className="glass-card btn-primary">Set Limit</button>
               </div>
             </form>
           </div>
