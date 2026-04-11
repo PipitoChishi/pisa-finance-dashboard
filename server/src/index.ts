@@ -3,14 +3,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { body, validationResult } from 'express-validator';
-import { 
-  Configuration, 
-  PlaidApi, 
-  PlaidEnvironments, 
-  Products, 
-  CountryCode,
-  TransactionsSyncRequest
-} from 'plaid';
 import supabase from './db';
 
 import dotenv from 'dotenv';
@@ -18,18 +10,6 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// --- Plaid Configuration ---
-const plaidConfig = new Configuration({
-  basePath: PlaidEnvironments[process.env.PLAID_ENV || 'sandbox'],
-  baseOptions: {
-    headers: {
-      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
-      'PLAID-SECRET': process.env.PLAID_SECRET,
-    },
-  },
-});
-const plaidClient = new PlaidApi(plaidConfig);
 
 // --- Security Middleware ---
 app.use(helmet());
@@ -148,98 +128,6 @@ app.post(
     res.json({ id: data?.[0]?.id, success: true });
   }
 );
-
-// --- Plaid Endpoints ---
-
-// 1. Create Link Token
-app.post('/api/create_link_token', async (req: Request, res: Response) => {
-  const { user_id } = req.body;
-  if (!user_id) return res.status(400).json({ error: 'User ID required' });
-
-  try {
-    const response = await plaidClient.linkTokenCreate({
-      user: { client_user_id: user_id },
-      client_name: 'Pisa Finance',
-      products: [Products.Transactions],
-      country_codes: [CountryCode.Us],
-      language: 'en',
-    });
-    res.json(response.data);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 2. Exchange Public Token for Access Token
-app.post('/api/exchange_public_token', async (req: Request, res: Response) => {
-  const { public_token, user_id, institution_name } = req.body;
-  if (!public_token || !user_id) return res.status(400).json({ error: 'Missing data' });
-
-  try {
-    const response = await plaidClient.itemPublicTokenExchange({
-      public_token: public_token,
-    });
-    const { access_token, item_id } = response.data;
-
-    // Save to Supabase
-    const { error } = await supabase
-      .from('plaid_items')
-      .insert([{ user_id, access_token, item_id, institution_name }]);
-
-    if (error) throw error;
-    res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 3. Sync Transactions
-app.post('/api/sync_transactions', async (req: Request, res: Response) => {
-  const { user_id } = req.body;
-  if (!user_id) return res.status(400).json({ error: 'User ID required' });
-
-  try {
-    // Get access tokens for user
-    const { data: items, error: itemError } = await supabase
-      .from('plaid_items')
-      .select('access_token')
-      .eq('user_id', user_id);
-
-    if (itemError || !items) throw new Error('No linked accounts found');
-
-    const MONTHS = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-
-    for (const item of items) {
-      const response = await plaidClient.transactionsSync({
-        access_token: item.access_token,
-      });
-
-      const transactions = response.data.added.map(t => {
-        const date = new Date(t.date);
-        return {
-          user_id,
-          type: t.amount > 0 ? 'expense' : 'income',
-          category: t.category?.[0] || 'Uncategorized',
-          amount: Math.abs(t.amount),
-          date: t.date,
-          month: MONTHS[date.getMonth()],
-          description: t.name,
-        };
-      });
-
-      if (transactions.length > 0) {
-        await supabase.from('transactions').insert(transactions);
-      }
-    }
-
-    res.json({ success: true, message: 'Transactions synced' });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);

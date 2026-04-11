@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   Target, 
@@ -9,9 +9,7 @@ import {
   TrendingUp, 
   TrendingDown,
   BarChart3,
-  Settings,
-  Link as LinkIcon,
-  RefreshCw
+  Settings
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -27,7 +25,6 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { usePlaidLink } from 'react-plaid-link';
 import { supabase } from './supabase';
 import './App.css';
 
@@ -72,9 +69,6 @@ function App() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authData, setAuthData] = useState({ email: '', password: '' });
   
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
-
   const [formData, setFormData] = useState({
     type: 'expense',
     category: '',
@@ -124,54 +118,6 @@ function App() {
   useEffect(() => {
     if (session) fetchData();
   }, [session, selectedMonth]);
-
-  // --- Plaid Integration ---
-  
-  const createLinkToken = useCallback(async () => {
-    if (!session?.user?.id) return;
-    const response = await fetch(`${API_URL}/api/create_link_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: session.user.id }),
-    });
-    const data = await response.json();
-    setLinkToken(data.link_token);
-  }, [session]);
-
-  const onPlaidSuccess = useCallback(async (public_token: string, metadata: any) => {
-    await fetch(`${API_URL}/api/exchange_public_token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        public_token,
-        user_id: session.user.id,
-        institution_name: metadata.institution.name
-      }),
-    });
-    alert('Bank connected successfully!');
-    syncTransactions();
-  }, [session]);
-
-  const { open, ready } = usePlaidLink({
-    token: linkToken,
-    onSuccess: onPlaidSuccess,
-  });
-
-  const syncTransactions = async () => {
-    if (!session?.user?.id) return;
-    setSyncing(true);
-    try {
-      await fetch(`${API_URL}/api/sync_transactions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: session.user.id }),
-      });
-      fetchData();
-    } catch (err) {
-      console.error('Sync error:', err);
-    }
-    setSyncing(false);
-  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -299,7 +245,6 @@ function App() {
           <div className={`nav-item ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}><Settings size={20} /> Settings</div>
           
           <div className="sidebar-footer" style={{ marginTop: 'auto' }}>
-            <div className="nav-item" onClick={() => { createLinkToken(); open(); }} style={{ color: '#3b82f6' }}><LinkIcon size={20} /> Connect Bank</div>
             <div className="nav-item" onClick={handleLogout}><LogOut size={20} /> Logout</div>
           </div>
         </nav>
@@ -308,7 +253,7 @@ function App() {
       <main className="main-content">
         <header className="main-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <h1>{view.charAt(0).toUpperCase() + view.slice(1)}</h1>
+            <h1>{view === 'dashboard' ? `${selectedMonth} Overview` : view.charAt(0).toUpperCase() + view.slice(1)}</h1>
             {view === 'dashboard' && (
               <select className="month-selector" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
                 {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
@@ -316,9 +261,6 @@ function App() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <button onClick={syncTransactions} disabled={syncing} className="glass-card btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <RefreshCw size={18} className={syncing ? 'spin' : ''} /> {syncing ? 'Syncing...' : 'Sync Bank'}
-            </button>
             <button onClick={() => setShowBudgetModal(true)} className="glass-card btn-outline">Set Budget</button>
             <button onClick={() => setShowModal(true)} className="glass-card btn-primary"><Plus size={20} /> Add Entry</button>
           </div>
