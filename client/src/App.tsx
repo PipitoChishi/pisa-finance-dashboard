@@ -4,7 +4,6 @@ import {
   Target, 
   History, 
   Plus, 
-  X, 
   LogOut, 
   Wallet, 
   TrendingUp, 

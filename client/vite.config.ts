@@ -7,13 +7,16 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-recharts': ['recharts'],
-          'vendor-lucide': ['lucide-react'],
-        },
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react')) return 'vendor-react';
+            if (id.includes('recharts')) return 'vendor-recharts';
+            if (id.includes('lucide')) return 'vendor-lucide';
+            return 'vendor';
+          }
+        }
       },
     },
-    chunkSizeWarningLimit: 1500, // Increase limit even more
+    chunkSizeWarningLimit: 1500,
   },
 })
