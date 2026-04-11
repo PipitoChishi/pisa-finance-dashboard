@@ -57,13 +57,9 @@ app.get('/api/transactions', async (req: Request, res: Response) => {
   if (!user_id) return res.status(400).json({ error: 'User ID required' });
 
   let query = supabase.from('transactions').select('*').eq('user_id', user_id);
-  
-  if (month) {
-    query = query.eq('month', month);
-  }
+  if (month) query = query.eq('month', month);
 
   const { data, error } = await query.order('date', { ascending: false });
-  
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -72,7 +68,6 @@ app.post(
   '/api/transactions',
   [
     body('user_id').isUUID().withMessage('Valid User ID required'),
-    body('type').isIn(['income', 'expense']).withMessage('Type must be income or expense'),
     body('category').isString().trim().escape().notEmpty(),
     body('amount').isNumeric().withMessage('Amount must be a number'),
     body('date').isString().trim().escape().notEmpty(),
@@ -81,10 +76,10 @@ app.post(
     handleValidationErrors
   ],
   async (req: Request, res: Response) => {
-    const { type, category, amount, date, description, month, user_id } = req.body;
+    const { category, amount, date, description, month, user_id } = req.body;
     const { data, error } = await supabase
       .from('transactions')
-      .insert([{ type, category, amount, date, description, month, user_id }])
+      .insert([{ type: 'expense', category, amount, date, description, month, user_id }])
       .select();
     
     if (error) return res.status(500).json({ error: error.message });
@@ -92,16 +87,32 @@ app.post(
   }
 );
 
+app.delete('/api/transactions/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { error } = await supabase.from('transactions').delete().eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+app.put('/api/transactions/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { category, amount, date, description } = req.body;
+  const { error } = await supabase
+    .from('transactions')
+    .update({ category, amount, date, description })
+    .eq('id', id);
+  
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
 // --- Budgets Endpoints ---
 app.get('/api/budgets', async (req: Request, res: Response) => {
   const { month, user_id } = req.query;
   if (!user_id) return res.status(400).json({ error: 'User ID required' });
 
   let query = supabase.from('budgets').select('*').eq('user_id', user_id);
-  
-  if (month) {
-    query = query.eq('month', month);
-  }
+  if (month) query = query.eq('month', month);
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
@@ -128,6 +139,13 @@ app.post(
     res.json({ id: data?.[0]?.id, success: true });
   }
 );
+
+app.delete('/api/budgets/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { error } = await supabase.from('budgets').delete().eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);
