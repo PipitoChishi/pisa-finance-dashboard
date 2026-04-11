@@ -143,7 +143,8 @@ function App() {
         ...formData,
         user_id: session.user.id,
         amount: Math.abs(parseFloat(formData.amount)),
-        month: selectedMonth
+        month: selectedMonth,
+        date: formData.date || new Date().toISOString().split('T')[0]
       })
     })
     .then(async (res) => {
@@ -231,7 +232,11 @@ function App() {
       <div className="auth-container">
         <div className="glass-card auth-card">
           <h2 style={{ textAlign: 'center', color: '#10b981' }}>Pisa Finance</h2>
-          {authMsg && <p style={{ color: authMsg.includes('Success') ? '#10b981' : '#f43f5e', textAlign: 'center', fontSize: '0.9rem', marginBottom: '1rem' }}>{authMsg}</p>}
+          {authMsg && (
+            <div className={authMsg.includes('Success') ? 'error-msg' : 'error-msg'} style={{ background: authMsg.includes('Success') ? 'rgba(16, 185, 129, 0.1)' : '', color: authMsg.includes('Success') ? '#10b981' : '', borderColor: authMsg.includes('Success') ? 'rgba(16, 185, 129, 0.2)' : '' }}>
+              {authMsg}
+            </div>
+          )}
           <form onSubmit={handleAuth}>
             <input type="email" placeholder="Email" required value={authData.email} onChange={e => setAuthData({...authData, email: e.target.value})} />
             <input type="password" placeholder="Password" required value={authData.password} onChange={e => setAuthData({...authData, password: e.target.value})} />
@@ -413,6 +418,7 @@ function App() {
         {uniqueCategories.map(cat => <option key={cat} value={cat} />)}
       </datalist>
 
+      {/* Expense Modal */}
       {showModal && (
         <div className="modal-overlay">
           <div className="glass-card modal-content">
@@ -421,7 +427,7 @@ function App() {
               <X size={24} style={{cursor:'pointer'}} onClick={() => { setShowModal(false); setEditingItem(null); }} />
             </div>
             <form onSubmit={handleTransactionSubmit}>
-              <input list="categories" placeholder="Category" required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
+              <input list="categories" placeholder="Category (e.g. Food)" required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
               <input type="number" step="0.01" placeholder="Amount" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
               <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
               <textarea placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
@@ -433,6 +439,7 @@ function App() {
         </div>
       )}
 
+      {/* Quick Add Modal */}
       {showQuickAdd && (
         <div className="modal-overlay">
           <div className="glass-card modal-content" style={{maxWidth:'350px'}}>
