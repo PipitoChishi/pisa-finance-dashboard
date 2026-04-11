@@ -349,7 +349,7 @@ function App() {
                         <div style={{ display:'flex', gap:'8px', alignItems:'center'}}>
                           <span>{b.name}</span>
                           <Trash2 size={14} style={{cursor:'pointer', color:'#f43f5e'}} onClick={() => handleDelete('budget', b.id)} />
-                          <PlusCircle size={16} style={{cursor:'pointer', color:'#3b82f6'}} onClick={() => setShowQuickAdd(b.name)} title="Quick Add Expense" />
+                          <PlusCircle size={16} style={{cursor:'pointer', color:'#3b82f6'}} onClick={() => setShowQuickAdd(b.name)}  />
                         </div>
                         <span style={{ color: b.spent > b.limit ? '#f43f5e' : '#10b981' }}>{formatMoney(b.spent)} / {formatMoney(b.limit)}</span>
                       </div>
