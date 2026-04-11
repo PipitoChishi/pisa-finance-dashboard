@@ -76,14 +76,6 @@ function App() {
   const [authMsg, setAuthMsg] = useState('');
 
   useEffect(() => {
-    // Debugging snippet requested by user
-    setTimeout(() => {
-      const el = document.querySelector('#root > div');
-      if (el) {
-        console.log("DEBUG STYLES:", getComputedStyle(el).height, getComputedStyle(el).display, getComputedStyle(el).position);
-      }
-    }, 1000);
-
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
@@ -215,7 +207,6 @@ function App() {
 
   if (loading) return <div className="loading">Loading...</div>;
 
-  // --- RENDER LOGIN PAGE (Applied User Requested Styles) ---
   if (!session) {
     return (
       <div style={{
@@ -226,7 +217,8 @@ function App() {
         justifyContent: 'center',
         background: '#0f172a',
         padding: '1.5rem',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        zIndex: 9999
       }}>
         <div style={{
           width: '100%',
@@ -236,13 +228,31 @@ function App() {
           border: '1px solid rgba(255,255,255,0.1)',
           borderRadius: '1.5rem',
           padding: '2.5rem',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)'
         }}>
           <h2 style={{ textAlign: 'center', color: '#10b981', marginBottom: '1.5rem', fontSize: '2rem', fontWeight: 800 }}>Pisa Finance</h2>
           {authMsg && <div className="error-msg">{authMsg}</div>}
           <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <input type="email" placeholder="Email" required value={authData.email} onChange={e => setAuthData({...authData, email: e.target.value})} />
-            <input type="password" placeholder="Password" required value={authData.password} onChange={e => setAuthData({...authData, password: e.target.value})} />
+            <input 
+              id="auth-email"
+              name="email"
+              type="email" 
+              placeholder="Email" 
+              autoComplete="email"
+              required 
+              value={authData.email} 
+              onChange={e => setAuthData({...authData, email: e.target.value})} 
+            />
+            <input 
+              id="auth-password"
+              name="password"
+              type="password" 
+              placeholder="Password" 
+              autoComplete={authMode === 'login' ? "current-password" : "new-password"}
+              required 
+              value={authData.password} 
+              onChange={e => setAuthData({...authData, password: e.target.value})} 
+            />
             <button type="submit" className="glass-card btn-primary">{authMode === 'login' ? 'Login' : 'Sign Up'}</button>
           </form>
           <p style={{ textAlign: 'center', marginTop: '1.5rem', cursor: 'pointer', color: '#94a3b8' }}
@@ -254,7 +264,6 @@ function App() {
     );
   }
 
-  // --- RENDER DASHBOARD ---
   const totalMonthlyBudget = budgets.reduce((acc, b) => acc + b.monthly_limit, 0);
   const totalMonthlyExpenses = transactions.reduce((acc, t) => acc + t.amount, 0);
   const remainingFunds = totalMonthlyBudget - totalMonthlyExpenses;
@@ -285,7 +294,7 @@ function App() {
         <header className="main-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <h1>{selectedMonth} Dashboard</h1>
-            <select className="month-selector" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+            <select id="month-selector" name="month" className="month-selector" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
               {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
@@ -363,7 +372,7 @@ function App() {
         {view === 'settings' && (
           <div className="glass-card" style={{ maxWidth: '400px' }}>
             <h3>Settings</h3>
-            <div style={{ marginBottom: '1.5rem' }}><label style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>Preferred Currency</label><select className="month-selector" style={{ width: '100%' }} value={currency} onChange={(e) => updateCurrency(e.target.value)}>{CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+            <div style={{ marginBottom: '1.5rem' }}><label htmlFor="currency-select" style={{ display: 'block', marginBottom: '0.5rem', color: '#94a3b8' }}>Preferred Currency</label><select id="currency-select" name="currency" className="month-selector" style={{ width: '100%' }} value={currency} onChange={(e) => updateCurrency(e.target.value)}>{CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
           </div>
         )}
       </main>
@@ -374,14 +383,20 @@ function App() {
         <div className="modal-overlay">
           <div className="glass-card modal-content">
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}><h2>{editingItem ? 'Edit Expense' : 'Add Expense'}</h2><X size={24} style={{cursor:'pointer'}} onClick={() => { setShowModal(false); setEditingItem(null); }} /></div>
-            <form onSubmit={handleTransactionSubmit}><input list="categories" placeholder="Category" required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} /><input type="number" step="0.01" placeholder="Amount" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /><textarea placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /><div className="button-group"><button type="submit" className="glass-card btn-primary">Save Entry</button></div></form>
+            <form onSubmit={handleTransactionSubmit}>
+              <input id="exp-category" name="category" list="categories" placeholder="Category" required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
+              <input id="exp-amount" name="amount" type="number" step="0.01" placeholder="Amount" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+              <input id="exp-date" name="date" type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+              <textarea id="exp-desc" name="description" placeholder="Description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+              <div className="button-group"><button type="submit" className="glass-card btn-primary">Save Entry</button></div>
+            </form>
           </div>
         </div>
       )}
 
       {showQuickAdd && (
         <div className="modal-overlay">
-          <div className="glass-card modal-content" style={{maxWidth:'350px'}}><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}><h2>Quick Add: {showQuickAdd}</h2><X size={24} style={{cursor:'pointer'}} onClick={() => setShowQuickAdd(null)} /></div><form onSubmit={handleQuickAdd}><input type="number" step="0.01" placeholder="Amount" autoFocus required value={quickAddAmount} onChange={e => setQuickAddAmount(e.target.value)} /><div className="button-group"><button type="submit" className="glass-card btn-primary">Add</button></div></form></div>
+          <div className="glass-card modal-content" style={{maxWidth:'350px'}}><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}><h2>Quick Add: {showQuickAdd}</h2><X size={24} style={{cursor:'pointer'}} onClick={() => setShowQuickAdd(null)} /></div><form onSubmit={handleQuickAdd}><input id="quick-amount" name="amount" type="number" step="0.01" placeholder="Amount" autoFocus required value={quickAddAmount} onChange={e => setQuickAddAmount(e.target.value)} /><div className="button-group"><button type="submit" className="glass-card btn-primary">Add</button></div></form></div>
         </div>
       )}
 
@@ -389,7 +404,11 @@ function App() {
         <div className="modal-overlay">
           <div className="glass-card modal-content">
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}><h2>Set Category Limit</h2><X size={24} style={{cursor:'pointer'}} onClick={() => setShowBudgetModal(false)} /></div>
-            <form onSubmit={handleBudgetSubmit}><input list="categories" placeholder="Category" required value={budgetFormData.category} onChange={e => setBudgetFormData({...budgetFormData, category: e.target.value})} /><input type="number" step="0.01" placeholder="Limit Amount" required value={budgetFormData.monthly_limit} onChange={e => setBudgetFormData({...budgetFormData, monthly_limit: e.target.value})} /><div className="button-group"><button type="submit" className="glass-card btn-primary">Save Limit</button></div></form>
+            <form onSubmit={handleBudgetSubmit}>
+              <input id="budget-category" name="category" list="categories" placeholder="Category" required value={budgetFormData.category} onChange={e => setBudgetFormData({...budgetFormData, category: e.target.value})} />
+              <input id="budget-limit" name="limit" type="number" step="0.01" placeholder="Limit Amount" required value={budgetFormData.monthly_limit} onChange={e => setBudgetFormData({...budgetFormData, monthly_limit: e.target.value})} />
+              <div className="button-group"><button type="submit" className="glass-card btn-primary">Save Limit</button></div>
+            </form>
           </div>
         </div>
       )}
