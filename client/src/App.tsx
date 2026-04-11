@@ -207,19 +207,38 @@ function App() {
 
   if (loading) return <div className="loading">Loading...</div>;
 
-  // --- RENDER LOGIN PAGE ---
+  // --- RENDER LOGIN PAGE (Applied User Requested Styles) ---
   if (!session) {
     return (
-      <div className="auth-page">
-        <div className="auth-card glass-card">
-          <h2 style={{ textAlign: 'center', color: '#10b981' }}>Pisa Finance</h2>
+      <div style={{
+        position: 'fixed',
+        top: 0, left: 0, right: 0, bottom: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#0f172a',
+        padding: '1.5rem',
+        boxSizing: 'border-box'
+      }}>
+        <div style={{
+          width: '100%',
+          maxWidth: '420px',
+          background: 'rgba(30, 41, 59, 0.9)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '1.5rem',
+          padding: '2.5rem',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+        }}>
+          <h2 style={{ textAlign: 'center', color: '#10b981', marginBottom: '1.5rem', fontSize: '2rem', fontWeight: 800 }}>Pisa Finance</h2>
           {authMsg && <div className="error-msg">{authMsg}</div>}
-          <form onSubmit={handleAuth}>
+          <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <input type="email" placeholder="Email" required value={authData.email} onChange={e => setAuthData({...authData, email: e.target.value})} />
             <input type="password" placeholder="Password" required value={authData.password} onChange={e => setAuthData({...authData, password: e.target.value})} />
             <button type="submit" className="glass-card btn-primary">{authMode === 'login' ? 'Login' : 'Sign Up'}</button>
           </form>
-          <p style={{ textAlign: 'center', marginTop: '1.5rem', cursor: 'pointer', color: '#94a3b8' }} onClick={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setAuthMsg(''); }}>
+          <p style={{ textAlign: 'center', marginTop: '1.5rem', cursor: 'pointer', color: '#94a3b8' }}
+            onClick={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setAuthMsg(''); }}>
             {authMode === 'login' ? "Don't have an account? Sign Up" : "Already have an account? Login"}
           </p>
         </div>
