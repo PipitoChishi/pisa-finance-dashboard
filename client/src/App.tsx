@@ -76,6 +76,14 @@ function App() {
   const [authMsg, setAuthMsg] = useState('');
 
   useEffect(() => {
+    // Debugging snippet requested by user
+    setTimeout(() => {
+      const el = document.querySelector('#root > div');
+      if (el) {
+        console.log("DEBUG STYLES:", getComputedStyle(el).height, getComputedStyle(el).display, getComputedStyle(el).position);
+      }
+    }, 1000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
